@@ -1,9 +1,10 @@
-import PySimpleGUI as sg, numpy as np, os
+import PySimpleGUI as sg, numpy as np, os, subprocess
 
 Map = None
 Agents = None
 width, height = 0, 0
 Single = False
+exec_name = './TFE_MAPF_visu'
 
 canvas_column = [
     [
@@ -68,6 +69,8 @@ settings_column = [
         sg.Button("Clear", key='clear', enable_events=True),
         sg.Button("Switch mode", key='switch', enable_events=True),
         sg.Button("Read res", key='res', enable_events=True),
+        sg.Button("Play", key='play', enable_events=True),
+        sg.Button("Solve", key='solve', enable_events=True),
     ]
 ]
 
@@ -123,6 +126,12 @@ def draw_paths(paths):
         for i in range(1, len(path)):
             canvas.create_line(path[i-1, 0]*size+size/2, path[i-1, 1]*size+size/2, path[i, 0]*size+size/2, path[i, 1]*size+size/2, fill="blue", width=2)
     
+def draw_agents_path(positions):
+    canvas_w = window["canvas"].get_size()[0]
+    canvas = window["canvas"].TKCanvas
+    size = canvas_w / width
+    for position in positions:
+        canvas.create_rectangle(position[0]*size, position[1]*size, position[0]*size+size, position[1]*size+size, fill="red", outline="red")
 
 def draw():
     canvas = window["canvas"].TKCanvas
@@ -152,6 +161,8 @@ def parseResult(filename):
         return paths
 
 
+playing = False
+step = 0
 while True:
     event, values = window.read()
     if event == "Exit" or event == sg.WIN_CLOSED:
@@ -182,6 +193,7 @@ while True:
         draw()
 
     elif event == "clear":
+        playing = False
         Map = None
         Agents = None
         height, width = 0, 0
@@ -226,5 +238,29 @@ while True:
     elif event == "res":
         paths = parseResult("result.txt")
         draw_paths(paths)
+    elif event == "play":
+        paths = parseResult("result.txt")
+        playing = True
+        step = 0
+    
+    elif event == "solve":
+        torun = [exec_name, \
+            "--map", values['mapfile'], \
+            "-a", f'10', \
+            "--outfile", "./result.txt"]
+        if not Single:
+            torun.append('-m')
+            torun.append('--scen')
+            torun.append(os.path.join(values["scenfile"], values["scenlist"][0]))
+        subprocess.run(torun)
+
+    if playing:
+        if step < paths.shape[1]:
+            draw_agents_path(paths[:, step, :].reshape(-1, 2))
+            step += 1
+        else:
+            playing = False
+            step = 0
+
 
 window.close()
